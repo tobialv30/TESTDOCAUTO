@@ -16,7 +16,7 @@ export default class LanguageSelector extends LightningElement {
     }
 
     get isEnglishSelected() {
-        return this.Seleccionar_tu_idioma_new === 'Englishghhhfghg';
+        return this.Seleccionar_tu_idioma_new === 'English';
     }
 
     get isPortugueseSelected() {
