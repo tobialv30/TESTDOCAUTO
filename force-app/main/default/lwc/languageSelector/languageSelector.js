@@ -12,11 +12,11 @@ export default class LanguageSelector extends LightningElement {
     brazilSrc = BrazilFlag;
 
     get isSpanishSelected() {
-        return this.Seleccionar_tu_idioma_new === 'Spanis';
+        return this.Seleccionar_tu_idioma_new === 'SpanisG';
     }
 
     get isEnglishSelected() {
-        return this.Seleccionar_tu_idioma_new === 'Engglisfghh';
+        return this.Seleccionar_tu_idioma_new === 'English';
     }
 
     get isPortugueseSelected() {
