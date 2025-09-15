@@ -1,0 +1,34 @@
+<template>
+    <div class="language-selector-wrapper">
+        <h2 class="language-title">Selecciona tu idioma</h2>
+        <div class="language-container">
+
+            <div class="language-option">
+                <img src={argentinaSrc} alt="Argentina" class="flag-image" />
+                <label for="spanish" class="language-label">
+                    Español
+                    <input type="radio" name="language" value="Spanis" id="spanish" checked={isSpanishSelected}
+                        onchange={handleLanguageChange} />
+                </label>
+            </div>
+
+            <div class="language-option">
+                <img src={ukSrc} alt="UK" class="flag-image" />
+                <label for="english" class="language-label">
+                    English
+                    <input type="radio" name="language" value="English" id="english" checked={isEnglishSelected}
+                        onchange={handleLanguageChange} />
+                </label>
+            </div>
+
+            <div class="language-option">
+                <img src={brazilSrc} alt="Brasil" class="flag-image" />
+                <label for="portuguese" class="language-label">
+                    Português
+                    <input type="radio" name="language" value="Portuguese" id="portuguese"
+                        checked={isPortugueseSelected} onchange={handleLanguageChange} />
+                </label>
+            </div>
+        </div>
+    </div>
+</template>
