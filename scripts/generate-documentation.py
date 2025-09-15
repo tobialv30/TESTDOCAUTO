@@ -597,7 +597,7 @@ class SalesforceDocumentationGenerator:
         }
         
         payload = {
-            'model': 'claude-3-5-sonnet-20240620',
+            'model': 'claude-sonnet-4-20250514',  # ✅ Modelo correcto 2025
             'max_tokens': 4000,
             'messages': [
                 {
