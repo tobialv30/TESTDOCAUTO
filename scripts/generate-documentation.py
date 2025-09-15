@@ -2,6 +2,7 @@
 """
 Generador automático de documentación Salesforce usando Claude API
 Push a GitHub → Análisis con Claude → Crear/Actualizar Confluence
+Version 2.0 - Fixed issues
 """
 
 import os
@@ -11,519 +12,72 @@ import requests
 import base64
 from pathlib import Path
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
-# Tu prompt EXACTO sin modificaciones
-DOCUMENTATION_PROMPT = """Experto en Documentación Salesforce Integral
-🎯 Tu Rol
-Eres un Consultor Salesforce Senior especializado en crear documentación técnica clara, visual y completa que cualquier desarrollador o administrador pueda entender inmediatamente.
+# Prompt MODIFICADO para ser directo y no interactivo
+DOCUMENTATION_PROMPT = """Eres un Consultor Salesforce Senior especializado en crear documentación técnica clara, visual y completa.
 
- 
+INSTRUCCIONES:
+- Analiza TODOS los componentes Salesforce proporcionados
+- Genera documentación COMPLETA y DEFINITIVA (no preguntas)
+- Identifica el componente principal y úsalo como título
+- Si hay múltiples componentes, documenta cada uno en secciones separadas
+- Incluye diagramas Mermaid cuando sea apropiado
+- Asume contexto típico de Salesforce cuando falte información específica
 
-Expertise  
-Documentacion V3 final.pdf 
+ESTRUCTURA REQUERIDA:
 
-Nubes Salesforce: Sales, Service, Marketing, Experience Cloud
+# [Nombre del Componente Principal]
 
-Desarrollo: Flows, Apex, LWC, Aura, Visualforce
+## 🎯 Resumen Ejecutivo
+**¿Qué hace?** [Explicación clara en 2 líneas]
+**Tipo:** [LWC/Apex/Flow/etc.]
+**Criticidad:** 🔴/🟡/🟢
 
-Integraciones: REST/SOAP APIs, MuleSoft, Middleware
+## 🏗️ Arquitectura y Diseño
 
-Arquitectura: Metadata, Security, DevOps, Performance
-
-Documentación: Confluence, Mermaid, Visual Design
-
-🚀 Proceso de Documentación
-PASO 1: Contexto Inicial
-Pregunta de arranque:
-
-"¿Esta documentación es para:
-
-a) 📝 Nueva funcionalidad - Documentar desde cero b) 🔄 Actualización - Mejorar documentación existente
-c) 📋 Auditoría - Documentar algo ya implementado sin docs d) 🔍 Análisis - Entender y explicar funcionalidad compleja"
-
-PASO 2: Recolección de Componentes
-Solicita específicamente estos elementos:
-
-📦 METADATA SALESFORCE
-[ ] Custom Objects (.object files o descripción completa)
-
-[ ] Custom Fields (API names, tipos, validaciones)
-
-[ ] Custom Metadata Types y Custom Settings
-
-[ ] Permission Sets y Profiles (FLS, CRUD, configuraciones)
-
-[ ] Named Credentials y External Data Sources
-
-🔄 FLOWS & AUTOMATIZACIÓN
-[ ] XML export del Flow O capturas de pantalla detalladas
-
-[ ] Tipo de Flow (Record-Triggered, Screen, Scheduled, etc.)
-
-[ ] Eventos disparadores y criterios de entrada
-
-[ ] Variables y fórmulas utilizadas
-
-[ ] Conexiones con otros procesos
-
-💻 CÓDIGO APEX
-[ ] Clases principales (.cls files)
-
-[ ] Triggers (.trigger files)
-
-[ ] Test Classes (.cls files) - Si no existen, los generaré
-
-[ ] Utility Classes y Helper Methods
-
-[ ] Exception Handling y Error Logging
-
-⚡ LIGHTNING COMPONENTS
-[ ] LWC: HTML, CSS, JS, XML files
-
-[ ] Props, eventos, y lifecycle hooks
-
-[ ] Interacción con Apex classes
-
-[ ] Diseño responsive y accesibilidad
-
-🔗 INTEGRACIONES
-[ ] External APIs (endpoints, autenticación)
-
-[ ] Data mapping entre sistemas
-
-[ ] Error handling y retry logic
-
-[ ] Monitoring y logging
-
-PASO 3: Contexto de Negocio
-Haz estas preguntas clave:
-
-🎯 PROPÓSITO
-¿Qué problema de negocio resuelve esta funcionalidad?
-
-¿Quién la usa y cuándo?
-
-¿Cuál es el ROI o impacto esperado?
-
-🔄 FLUJO COMPLETO
-¿Cuál es el journey completo del usuario?
-
-¿Qué sistemas externos están involucrados?
-
-¿Hay dependencias con otros módulos?
-
-⚠️ CRITICIDAD
-¿Qué pasa si esta funcionalidad falla?
-
-¿Es crítica para operaciones diarias?
-
-¿Hay procesos de rollback o contingencia?
-
-PASO 4: Validación y Clarificación
-Si algo no está claro, pregunta específicamente:
-
-"¿Qué lógica de negocio maneja este paso del Flow?"
-
-"¿Cómo se conecta [componente A] con [componente B]?"
-
-"¿Qué validaciones aplicamos y por qué?"
-
-"¿Esta integración es en tiempo real o batch?"
-
-📋 Estructura del Documento
-🔖 ENCABEZADO
-
-
-# [Nombre de la Funcionalidad]
-## 🎯 Presentación Ejecutiva
-**¿Qué hace?** [Explicación en 2 líneas máximo]
-**¿Para quién?** [Usuarios finales]  
-**¿Por qué es importante?** [Valor de negocio]
-**Versión Salesforce:** [Ej: Spring '25]
-📊 INVENTARIO DE COMPONENTES
-Tabla visual con criticidad por colores:
-
-Componente
-
-Tipo
-
-Criticidad
-
-Descripción
-
-AccountFlow
-
-Flow
-
-🔴 Crítico
-
-Automatiza creación de cuentas
-
-LeadProcessor
-
-Apex
-
-🟡 Importante
-
-Procesa leads entrantes
-
-AccountCard
-
-LWC
-
-🟢 Informativo
-
-Vista de tarjeta de cuenta
-
-Leyenda:
-
-🔴 Crítico: Afecta operaciones core del negocio
-
-🟡 Importante: Impacta flujos de trabajo importantes
-
-🟢 Informativo: Mejora experiencia de usuario
-
-🏗️ ARQUITECTURA GENERAL
-
-
+```mermaid
 graph TB
-    A[Usuario] -->|Accede| B[Lightning App]
-    B -->|Ejecuta| C[Flow Principal]
-    C -->|Llama| D[Apex Class]
-    D -->|Integra| E[Sistema Externo]
-    E -->|Responde| D
-    D -->|Actualiza| F[Salesforce Records]
-📦 OBJETOS Y METADATA
-Para cada Custom Object:
+    A[Usuario] --> B[Componente Principal]
+    B --> C[Dependencias]
+```
 
-📋 [Objeto_Name__c]
-Propósito: [Por qué existe este objeto] Relaciones: [Con qué otros objetos se relaciona]
+## 📦 Componentes Técnicos
 
-Campo
+### [Para cada componente encontrado]
+**Archivo:** `nombreArchivo.ext`
+**Propósito:** [Función específica]
+**Dependencias:** [Otros componentes que usa]
 
-API Name
+## 💻 Implementación
 
-Tipo
+[Código principal con explicaciones línea por línea]
 
-Requerido
+## ⚠️ Consideraciones y Limitaciones
 
-Propósito
+- [Limitaciones conocidas]
+- [Dependencias críticas]
+- [Posibles puntos de falla]
 
-Nombre
+## 🔧 Mantenimiento y Troubleshooting
 
-Name
+### Problemas Comunes
+- **Problema:** [Descripción]
+- **Causa:** [Por qué ocurre]  
+- **Solución:** [Cómo solucionarlo]
 
-Text(80)
-
-✅
-
-Identificador único
-
-Estado
-
-Status__c
-
-Picklist
-
-✅
-
-Control de flujo
-
-Validation Rules:
-
-Rule_Name: [Qué valida y por qué es necesario]
-
-🔄 FLOWS DETALLADOS
-Para cada Flow:
-
-⚡ [Flow Name]
-Tipo: Record-Triggered Flow
-
-Objeto: Account
-
-Disparador: Before Save
-
-Propósito: [Qué automatiza específicamente]
-
-Diagrama de Flujo:
-
-
-
-flowchart TD
-    Start([Registro Creado]) --> Check{¿Cumple Criterios?}
-    Check -->|Sí| Process[Procesar Datos]
-    Check -->|No| End([Fin])
-    Process --> Update[Actualizar Campos]
-    Update --> Notify[Enviar Notificación]
-    Notify --> End
-Lógica Paso a Paso:
-
-Criterios de Entrada: [Condiciones específicas]
-
-Variables: [Qué se calcula y cómo]
-
-Decisiones: [Lógica de branching]
-
-Acciones: [Qué operaciones se ejecutan]
-
-Manejo de Errores: [Qué pasa si algo falla]
-
-Datos de Entrada:
-
-recordId: ID del registro disparador
-
-customField__c: [Descripción del campo]
-
-Datos de Salida:
-
-Campos actualizados: [Lista específica]
-
-Registros creados: [Tipos y cantidades]
-
-Notificaciones enviadas: [A quién y cuándo]
-
-💻 CÓDIGO APEX
-Para cada clase:
-
-🏛️ [ClassName]
-Propósito: [Qué problema resuelve] Patrón: [Singleton, Handler, Utility, etc.] Dependencies: [Qué otras clases usa]
-
-
-
-public with sharing class AccountProcessor {
-    /**
-     * Procesa cuentas nuevas aplicando reglas de negocio
-     * @param accounts Lista de cuentas a procesar
-     * @return Map<Id, String> Resultados del procesamiento
-     */
-    public static Map<Id, String> processNewAccounts(List<Account> accounts) {
-        // Implementación explicada paso a paso
-    }
-}
-Métodos Principales:
-
-processNewAccounts(): [Qué hace, cuándo se llama]
-
-validateBusinessRules(): [Validaciones específicas]
-
-handleExceptions(): [Cómo maneja errores]
-
-Test Coverage:
-
-Clase Test: AccountProcessor_Test
-
-Coverage: 95%
-
-Escenarios: [Lista de casos cubiertos]
-
-⚡ LIGHTNING WEB COMPONENTS
-Para cada LWC:
-
-🎨 [componentName]
-Propósito: [Qué interfaz proporciona] Ubicación: [Dónde se usa en Salesforce] Responsive: [Sí/No y consideraciones]
-
-Estructura:
-
-
-
-componentName/
-├── componentName.html       // Template - UI Structure
-├── componentName.js         // Logic - Event Handling  
-├── componentName.css        // Styles - Visual Design
-└── componentName.js-meta.xml // Config - Where it's used
-Props y Eventos:
-
-Prop/Event
-
-Tipo
-
-Descripción
-
-Ejemplo
-
-recordId
-
-@api String
-
-ID del registro actual
-
-'0015000000XXXXX'
-
-onSuccess
-
-CustomEvent
-
-Se dispara al guardar
-
-{detail: {id: 'xxx'}}
-
-Interacción con Apex:
-
-Métodos llamados: [Lista de @AuraEnabled methods]
-
-Datos intercambiados: [Qué se envía y recibe]
-
-🔗 INTEGRACIONES
-Para cada integración:
-
-🌐 [Sistema Externo]
-Propósito: [Qué datos sincroniza y por qué] Frecuencia: [Tiempo real, batch, scheduled] Criticidad: 🔴/🟡/🟢
-
-Diagrama de Secuencia:
-
-
-
-sequenceDiagram
-    participant SF as Salesforce
-    participant EXT as Sistema Externo
-    SF->>SF: Trigger detecta cambio
-    SF->>EXT: POST /api/endpoint
-    EXT-->>SF: 200 OK + Data
-    SF->>SF: Actualiza registros
-    SF->>SF: Log resultado
-Mapeo de Datos:
-
-Campo SF
-
-Campo Externo
-
-Transformación
-
-Requerido
-
-Account.Name
-
-company_name
-
-Ninguna
-
-✅
-
-Account.Revenue__c
-
-annual_revenue
-
-String → Number
-
-❌
-
-Manejo de Errores:
-
-Timeout: [Cómo se maneja]
-
-Auth Failure: [Proceso de retry]
-
-Invalid Data: [Validaciones aplicadas]
-
-🔒 SEGURIDAD Y PERMISOS
-Permission Sets Necesarios:
-CustomApp_User: [Qué permisos incluye]
-
-CustomApp_Admin: [Permisos adicionales]
-
-Field Level Security:
-Campo
-
-Read
-
-Edit
-
-Justificación
-
-Sensitive_Field__c
-
-Admin Only
-
-Admin Only
-
-Datos financieros
-
-⚠️ TROUBLESHOOTING
-Problema
-
-Síntomas
-
-Causa Probable
-
-Solución
-
-Flow no ejecuta
-
-Records no se actualizan
-
-Criterios incorrectos
-
-Revisar condiciones de entrada
-
-Apex error
-
-"Null pointer exception"
-
-Falta validación
-
-Agregar null checks
-
-LWC no carga
-
-Pantalla en blanco
-
-Permisos faltantes
-
-Asignar Permission Set
-
-Debug y Logs:
-Para Flows:
-
-
-
-Setup → Debug Logs → New → Workflow and Flow = FINEST
-Para Apex:
-
-
-
-System.debug(LoggingLevel.INFO, '🔍 Processing: ' + recordId);
-Para LWC:
-
-
-
-console.log('🎨 Component loaded with recordId:', this.recordId);
-📊 PIE DE DOCUMENTO
-📌 Información del Documento
-Versión: 1.0
-
-Salesforce Release: Spring '25
-
-Fecha Creación: [DD/MM/YYYY]
-
-Última Actualización: [DD/MM/YYYY]
-
-Próxima Revisión: [Fecha + 3 meses]
-
-Elaborado por: [Team/Persona]
-
-📝 Control de Cambios
-Versión
-
-Fecha
-
-Autor
-
-Cambios
-
-1.0
-
-[Fecha]
-
-[Nombre]
-
-Documentación inicial
-
-Pregunta final: "¿Falta algún aspecto técnico o de negocio para que el equipo pueda mantener y evolucionar esta funcionalidad efectivamente?"
+## 📊 Información del Documento
+- **Última actualización:** [FECHA_ACTUAL]
+- **Versión:** [VERSION]
+- **Componentes analizados:** [LISTA_COMPONENTES]
 
 ---
 
-IMPORTANTE: Analiza TODOS los archivos del repositorio, identifica componentes Salesforce, y genera documentación COMPLETA siguiendo EXACTAMENTE esta estructura. Si existe documentación previa en Confluence, actualízala manteniendo historial. Si no existe, crea nueva página."""
+IMPORTANTE: 
+- NO hagas preguntas
+- NO solicites información adicional  
+- Genera documentación completa basada SOLO en los archivos proporcionados
+- Si falta contexto, haz suposiciones razonables basadas en mejores prácticas de Salesforce"""
 
 class SalesforceDocumentationGenerator:
     def __init__(self):
@@ -540,7 +94,7 @@ class SalesforceDocumentationGenerator:
             sys.exit(1)
 
     def analyze_salesforce_repository(self) -> Dict:
-        """Analiza el repositorio y extrae información de componentes Salesforce"""
+        """Analiza el repositorio y extrae información COMPLETA de componentes Salesforce"""
         salesforce_files = []
         repo_structure = {}
         
@@ -552,9 +106,12 @@ class SalesforceDocumentationGenerator:
             'lwc_html': '**/lwc/**/*.html',
             'lwc_js': '**/lwc/**/*.js',
             'lwc_css': '**/lwc/**/*.css',
+            'lwc_xml': '**/lwc/**/*.js-meta.xml',  # AÑADIDO: metadata de LWC
             'objects': '**/*.object-meta.xml',
             'permission_sets': '**/*.permissionset-meta.xml',
-            'custom_metadata': '**/*.md-meta.xml'
+            'custom_metadata': '**/*.md-meta.xml',
+            'custom_labels': '**/*.labels-meta.xml',  # AÑADIDO: labels
+            'static_resources': '**/*.resource-meta.xml'  # AÑADIDO: static resources
         }
         
         for component_type, pattern in patterns.items():
@@ -564,31 +121,117 @@ class SalesforceDocumentationGenerator:
                 for file_path in files:
                     try:
                         with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
+                            content = f.read()  # CAMBIO: Lee archivo completo
                         repo_structure[component_type].append({
                             'path': str(file_path),
-                            'content': content[:5000]  # Limit content size
+                            'content': content,
+                            'size': len(content)
                         })
                     except Exception as e:
                         print(f"⚠️ Error leyendo {file_path}: {e}")
         
         return repo_structure
 
-    def call_claude_api(self, repository_data: Dict) -> str:
+    def identify_main_component(self, repository_data: Dict) -> str:
+        """Identifica el componente principal para usar como título"""
+        
+        # Prioridad de tipos de componentes
+        component_priority = [
+            'lwc_js',        # Lightning Web Components (más específicos)
+            'apex_classes',  # Apex Classes
+            'flows',         # Flows
+            'apex_triggers', # Triggers
+            'objects'        # Custom Objects
+        ]
+        
+        for component_type in component_priority:
+            if component_type in repository_data and repository_data[component_type]:
+                files = repository_data[component_type]
+                
+                # Para LWC, extraer nombre del componente
+                if component_type == 'lwc_js':
+                    for file_info in files:
+                        path_parts = Path(file_info['path']).parts
+                        if 'lwc' in path_parts:
+                            lwc_index = list(path_parts).index('lwc')
+                            if lwc_index + 1 < len(path_parts):
+                                component_name = path_parts[lwc_index + 1]
+                                return f"LWC - {component_name}"
+                
+                # Para otros tipos, usar nombre de archivo
+                first_file = files[0]
+                file_name = Path(first_file['path']).stem
+                component_type_name = component_type.replace('_', ' ').title()
+                return f"{component_type_name} - {file_name}"
+        
+        # Fallback
+        return "Salesforce Components Documentation"
+
+    def search_component_specific_pages(self, component_name: str) -> List[str]:
+        """Busca páginas existentes relacionadas con el componente específico"""
+        
+        search_url = f"{self.atlassian_base_url}/rest/api/content/search"
+        auth = (self.atlassian_email, self.atlassian_api_token)
+        
+        # Buscar páginas con términos relacionados al componente
+        search_terms = [
+            component_name,
+            component_name.replace('-', ' '),
+            component_name.split('-')[-1] if '-' in component_name else component_name
+        ]
+        
+        existing_pages = []
+        
+        for term in search_terms:
+            params = {
+                'cql': f'space = "{self.confluence_space_key}" AND type = "page" AND title ~ "{term}"',
+                'limit': 10
+            }
+            
+            try:
+                response = requests.get(search_url, auth=auth, params=params)
+                if response.status_code == 200:
+                    results = response.json()
+                    for page in results.get('results', []):
+                        existing_pages.append({
+                            'id': page['id'],
+                            'title': page['title'],
+                            'url': f"{self.atlassian_base_url}{page['_links']['webui']}"
+                        })
+            except Exception as e:
+                print(f"⚠️ Error buscando páginas para '{term}': {e}")
+        
+        return existing_pages
+
+    def call_claude_api(self, repository_data: Dict, main_component: str) -> str:
         """Llama a Claude API para generar documentación"""
         
-        # Construir contexto del repositorio
-        repo_context = "CONTEXTO DEL REPOSITORIO SALESFORCE:\n\n"
+        # Construir contexto del repositorio con TODOS los datos
+        repo_context = f"REPOSITORIO SALESFORCE - COMPONENTE PRINCIPAL: {main_component}\n\n"
         
+        total_files = 0
         for component_type, files in repository_data.items():
             if files:
                 repo_context += f"\n## {component_type.upper().replace('_', ' ')}\n"
                 for file_info in files:
-                    repo_context += f"\n### Archivo: {file_info['path']}\n"
+                    repo_context += f"\n### 📄 {file_info['path']} ({file_info['size']} chars)\n"
                     repo_context += f"```\n{file_info['content']}\n```\n"
+                    total_files += 1
+        
+        repo_context += f"\n\nTOTAL ARCHIVOS ANALIZADOS: {total_files}\n"
+        repo_context += f"COMPONENTE PRINCIPAL IDENTIFICADO: {main_component}\n"
+        
+        # Agregar contexto de fecha y versión
+        from datetime import datetime
+        current_date = datetime.now().strftime("%d/%m/%Y")
+        
+        # Prompt personalizado con contexto
+        contextualized_prompt = DOCUMENTATION_PROMPT.replace('[FECHA_ACTUAL]', current_date)
+        contextualized_prompt = contextualized_prompt.replace('[VERSION]', '1.0')
+        contextualized_prompt = contextualized_prompt.replace('[LISTA_COMPONENTES]', str(list(repository_data.keys())))
         
         # Prompt completo
-        full_prompt = f"{repo_context}\n\n{DOCUMENTATION_PROMPT}"
+        full_prompt = f"{repo_context}\n\n{contextualized_prompt}"
         
         headers = {
             'Content-Type': 'application/json',
@@ -597,7 +240,7 @@ class SalesforceDocumentationGenerator:
         }
         
         payload = {
-            'model': 'claude-sonnet-4-20250514',  # ✅ Modelo correcto 2025
+            'model': 'claude-sonnet-4-20250514',
             'max_tokens': 4000,
             'messages': [
                 {
@@ -609,6 +252,9 @@ class SalesforceDocumentationGenerator:
         
         try:
             print("🤖 Llamando a Claude API...")
+            print(f"📊 Contexto enviado: {len(full_prompt)} caracteres")
+            print(f"📁 Archivos analizados: {total_files}")
+            
             response = requests.post(
                 'https://api.anthropic.com/v1/messages',
                 headers=headers,
@@ -618,7 +264,9 @@ class SalesforceDocumentationGenerator:
             
             if response.status_code == 200:
                 result = response.json()
-                return result['content'][0]['text']
+                documentation = result['content'][0]['text']
+                print(f"✅ Documentación generada: {len(documentation)} caracteres")
+                return documentation
             else:
                 print(f"❌ Error en Claude API: {response.status_code}")
                 print(response.text)
@@ -628,6 +276,90 @@ class SalesforceDocumentationGenerator:
             print(f"❌ Error llamando Claude API: {e}")
             return None
 
+    def extract_title_from_documentation(self, content: str, main_component: str) -> str:
+        """Extrae el título de la documentación o usa el componente principal"""
+        
+        # Buscar primer H1
+        match = re.search(r'^# (.+?)$', content, re.MULTILINE)
+        if match:
+            title = match.group(1).strip()
+            # Limpiar emojis y caracteres especiales para Confluence
+            title = re.sub(r'[🎯🏗️📦💻⚠️🔧📊]', '', title).strip()
+            return title
+        
+        # Usar componente principal identificado
+        return main_component
+
+    def run(self):
+        """Ejecuta el proceso completo de generación de documentación"""
+        
+        print("🚀 Iniciando generación automática de documentación Salesforce v2.0")
+        print("=" * 70)
+        
+        # 1. Analizar repositorio
+        print("\n📁 Paso 1: Analizando repositorio Salesforce...")
+        repository_data = self.analyze_salesforce_repository()
+        
+        if not repository_data:
+            print("⚠️ No se encontraron archivos Salesforce en el repositorio")
+            return False
+        
+        # 2. Identificar componente principal
+        print("\n🎯 Paso 2: Identificando componente principal...")
+        main_component = self.identify_main_component(repository_data)
+        print(f"✅ Componente principal: {main_component}")
+        
+        print(f"📊 Archivos encontrados:")
+        for component_type, files in repository_data.items():
+            print(f"   - {component_type}: {len(files)} archivos")
+        
+        # 3. Buscar documentación existente específica
+        print("\n🔍 Paso 3: Buscando documentación existente...")
+        existing_pages = self.search_component_specific_pages(main_component)
+        
+        if existing_pages:
+            print(f"📄 Páginas relacionadas encontradas:")
+            for page in existing_pages:
+                print(f"   - {page['title']} (ID: {page['id']})")
+        else:
+            print("ℹ️ No se encontró documentación existente específica")
+        
+        # 4. Generar documentación con Claude
+        print("\n🤖 Paso 4: Generando documentación con Claude...")
+        documentation = self.call_claude_api(repository_data, main_component)
+        
+        if not documentation:
+            print("❌ Error generando documentación")
+            return False
+        
+        # 5. Extraer título final
+        final_title = self.extract_title_from_documentation(documentation, main_component)
+        print(f"📋 Título final: {final_title}")
+        
+        # 6. Decidir crear o actualizar
+        print("\n📝 Paso 5: Publicando en Confluence...")
+        
+        # Buscar página específica con el título exacto
+        specific_page_id = self.search_confluence_page(final_title)
+        
+        if specific_page_id:
+            success = self.update_confluence_page(specific_page_id, final_title, documentation)
+            print("🔄 Página actualizada")
+        else:
+            success = self.create_confluence_page(final_title, documentation)
+            print("🆕 Nueva página creada")
+        
+        if success:
+            print("\n🎉 ¡Proceso completado exitosamente!")
+            print(f"📊 Confluence Space: {self.confluence_space_key}")
+            print(f"📄 Página: {final_title}")
+            print(f"🎯 Componente: {main_component}")
+            return True
+        else:
+            print("\n❌ Error en el proceso de publicación")
+            return False
+
+    # ... resto de métodos sin cambios (search_confluence_page, create_confluence_page, etc.)
     def search_confluence_page(self, title: str) -> Optional[str]:
         """Busca si existe una página en Confluence con el título dado"""
         
@@ -807,72 +539,6 @@ class SalesforceDocumentationGenerator:
         )
         
         return content
-
-    def extract_title_from_documentation(self, content: str) -> str:
-        """Extrae el título principal de la documentación generada"""
-        
-        # Buscar primer H1
-        match = re.search(r'^# (.+?)$', content, re.MULTILINE)
-        if match:
-            return match.group(1).strip()
-        
-        # Fallback: usar información del repositorio
-        repo_name = os.getenv('GITHUB_REPOSITORY', 'Salesforce Project')
-        repo_name = repo_name.split('/')[-1] if '/' in repo_name else repo_name
-        return f"Documentación Técnica - {repo_name}"
-
-    def run(self):
-        """Ejecuta el proceso completo de generación de documentación"""
-        
-        print("🚀 Iniciando generación automática de documentación Salesforce")
-        print("=" * 60)
-        
-        # 1. Analizar repositorio
-        print("\n📁 Paso 1: Analizando repositorio Salesforce...")
-        repository_data = self.analyze_salesforce_repository()
-        
-        if not repository_data:
-            print("⚠️ No se encontraron archivos Salesforce en el repositorio")
-            return False
-        
-        print(f"✅ Encontrados {len(repository_data)} tipos de componentes")
-        for component_type, files in repository_data.items():
-            print(f"   - {component_type}: {len(files)} archivos")
-        
-        # 2. Generar documentación con Claude
-        print("\n🤖 Paso 2: Generando documentación con Claude...")
-        documentation = self.call_claude_api(repository_data)
-        
-        if not documentation:
-            print("❌ Error generando documentación")
-            return False
-        
-        print(f"✅ Documentación generada ({len(documentation)} caracteres)")
-        
-        # 3. Extraer título
-        title = self.extract_title_from_documentation(documentation)
-        print(f"📋 Título extraído: {title}")
-        
-        # 4. Buscar página existente
-        print("\n🔍 Paso 3: Buscando página existente en Confluence...")
-        existing_page_id = self.search_confluence_page(title)
-        
-        # 5. Crear o actualizar página
-        print("\n📝 Paso 4: Publicando en Confluence...")
-        
-        if existing_page_id:
-            success = self.update_confluence_page(existing_page_id, title, documentation)
-        else:
-            success = self.create_confluence_page(title, documentation)
-        
-        if success:
-            print("\n🎉 ¡Proceso completado exitosamente!")
-            print(f"📊 Confluence Space: {self.confluence_space_key}")
-            print(f"📄 Página: {title}")
-            return True
-        else:
-            print("\n❌ Error en el proceso de publicación")
-            return False
 
 if __name__ == "__main__":
     generator = SalesforceDocumentationGenerator()

@@ -5,7 +5,6 @@ import BrazilFlag from '@salesforce/resourceUrl/BrazilFlag';
 
 export default class LanguageSelector extends LightningElement {
     @api Seleccionar_tu_idioma_new; 
-    @api Seleccionar_tu_idioma; 
 
     argentinaSrc = ArgentinaFlag;
     ukSrc = UKFlag;
